@@ -1,12 +1,8 @@
 
 #include <stdint.h>
 
-typedef struct {
-    volatile uint32_t MEMRMP;
-    volatile uint32_t CFGR1;
-    volatile uint32_t EXTICR[4];
-    volatile uint32_t CFGR2;
-} SYSCFG_t;
+void configure_gpio(void);
+volatile uint8_t button_pressed = 0; // Flag to indicate button press
 
 typedef struct {
     volatile uint32_t IMR1;

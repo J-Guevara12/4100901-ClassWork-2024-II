@@ -58,16 +58,6 @@ void configure_gpio(void)
     *NVIC_ISER1 |= (1 << (EXTI15_10_IRQn - 32));
 }
 
-uint8_t gpio_button_is_pressed(void)
-{
-    return BUTTON_IS_PRESSED();
-}
-
-void gpio_toggle_led(void)
-{
-    TOGGLE_LED();
-}
-
 void EXTI15_10_IRQHandler(void)
 {
     if (EXTI->PR1 & (1 << BUTTON_PIN)) {
