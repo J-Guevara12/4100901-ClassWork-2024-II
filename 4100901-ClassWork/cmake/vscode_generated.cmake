@@ -26,6 +26,7 @@ set(sources_SRCS ${sources_SRCS}
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/gpio.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/systick.c
+	${CMAKE_CURRENT_SOURCE_DIR}/Src/fms.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/gpio.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/syscall.c
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/sysmem.c

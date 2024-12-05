@@ -1,8 +1,10 @@
+#ifndef GPIO_H
+#define GPIO_H
 
 #include <stdint.h>
 
 void configure_gpio(void);
-volatile uint8_t button_pressed = 0; // Flag to indicate button press
+
 
 typedef struct {
     volatile uint32_t IMR1;
@@ -37,5 +39,13 @@ typedef struct {
 void init_gpio_pin(GPIO_t *GPIOx, uint8_t pin, uint8_t mode);
 void configure_gpio(void);
 
-uint8_t gpio_button_is_pressed(void);
-void gpio_toggle_led(void);
+#define GPIOA ((GPIO_t *)0x48000000) // Base address of GPIOA
+#define GPIOC ((GPIO_t *)0x48000800) // Base address of GPIOC
+
+#define LED_PIN 5 // Pin 5 of GPIOA
+#define BUTTON_PIN 13 // Pin 13 of GPIOC
+
+#define BUTTON_IS_PRESSED()    (!(GPIOC->IDR & (1 << BUTTON_PIN)))
+#define BUTTON_IS_RELEASED()   (GPIOC->IDR & (1 << BUTTON_PIN))
+#define TOGGLE_LED()           (GPIOA->ODR ^= (1 << LED_PIN))
+#endif

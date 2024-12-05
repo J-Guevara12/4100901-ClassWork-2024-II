@@ -62,6 +62,5 @@ void EXTI15_10_IRQHandler(void)
 {
     if (EXTI->PR1 & (1 << BUTTON_PIN)) {
         EXTI->PR1 = (1 << BUTTON_PIN); // Clear pending bit
-        button_pressed = 1; // Set button pressed flag
     }
 }
