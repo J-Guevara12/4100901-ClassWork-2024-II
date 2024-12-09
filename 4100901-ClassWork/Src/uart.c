@@ -1,5 +1,6 @@
 #include "uart.h"
 #include "rcc.h"
+#include <stdint.h>
 
 void UART_clock_enable(USART_TypeDef * UARTx) {
     if (UARTx == USART1) {
@@ -56,5 +57,13 @@ void UART_send_string(USART_TypeDef * UARTx, char * str) {
     // Send each character in the string
     while (*str) {
         UART_send_char(UARTx, *str++);
+    }
+}
+
+void USART_Read(USART_TypeDef *USARTx, uint8_t *buffer, uint32_t nBytes){
+    uint32_t i;
+    for (i=0; i < nBytes; i++){
+        while (!(USARTx->ISR & USART_ISR_RXNE));
+        buffer[i] = USARTx -> RDR;
     }
 }

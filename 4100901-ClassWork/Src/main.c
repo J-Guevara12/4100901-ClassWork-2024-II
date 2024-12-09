@@ -4,6 +4,7 @@
 #include "gpio.h"
 #include "uart.h"
 
+unsigned char buff[8];
 
 int main(void)
 {
@@ -14,6 +15,11 @@ int main(void)
 
     uint8_t state = 0; // state of the FSM
     UART_send_string(USART2, "Hello World, from main!\r\n");
+    UART_send_string(USART2, "Now, you have to write 8 characters:\r\n");
+    USART_Read(USART2, buff, 8);
+    UART_send_string(USART2, "The characters you sent are: ");
+    UART_send_string(USART2, (char *) buff);
+    UART_send_string(USART2, "\r\n");
 
     while (1) {
         switch (state) {
