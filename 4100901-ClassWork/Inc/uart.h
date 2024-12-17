@@ -27,6 +27,7 @@ typedef struct {
 
 // Bit definitions for USART_CR1 register
 #define USART_CR1_UE      (1U << 0)    // USART enable
+#define USART_CR1_TXEIE   (1U << 7)    // Interrupt Enable
 #define USART_CR1_M       (1U << 12)   // Word length (0 = 8 bits, 1 = 9 bits)
 #define USART_CR1_PCE     (1U << 10)   // Parity control enable
 #define USART_CR1_OVER8   (1U << 15)   // Oversampling mode
@@ -37,6 +38,8 @@ typedef struct {
 #define USART_CR2_STOP    (3U << 12)   // STOP bits (00 = 1 Stop bit)
 
 // Bit definitions for USART_ISR register
+#define USART_ISR_RXNE    (1U << 5)     // Read data register not empty
+#define USART_ISR_TXE     (1U << 7)    // Transmit data register empty
 #define USART_ISR_TEACK   (1U << 21)   // Transmit enable acknowledge flag
 #define USART_ISR_REACK   (1U << 22)   // Receive enable acknowledge flag
 
@@ -45,10 +48,8 @@ typedef struct {
 
 
 void UART_Init (USART_TypeDef * UARTx);
-void UART_send_char(USART_TypeDef * UARTx, char ch);
-void UART_send_string(USART_TypeDef * UARTx, char * str);
 
-void UART_receive_string(USART_TypeDef * UARTx, uint8_t *buffer, uint8_t len);
 void UART_receive_it(USART_TypeDef * UARTx, uint8_t *buffer, uint8_t len);
+void UART_print(USART_TypeDef *USARTx, char *str);
 
 extern uint8_t rx_ready;
