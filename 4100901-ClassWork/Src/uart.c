@@ -1,7 +1,22 @@
 #include "uart.h"
 #include "rcc.h"
+#include "gpio.h"
+#include "fms.h"
 
 #include "nvic.h"
+#include <stdint.h>
+
+
+void UART_enable_nvic_it(USART_TypeDef * UARTx) {
+    if (UARTx == USART1) {
+        NVIC->ISER[1] |= (1 << 5);
+    } else if (UARTx == USART2) {
+        NVIC->ISER[1] |= (1 << 6);
+    } else if (UARTx == USART3) {
+        NVIC->ISER[1] |= (1 << 7);
+    }
+}
+
 
 void UART_clock_enable(USART_TypeDef * UARTx) {
     if (UARTx == USART1) {
@@ -36,6 +51,10 @@ void UART_Init (USART_TypeDef * UARTx) {
     // Enable transmission and reception
     UARTx->CR1 |= (USART_CR1_TE | USART_CR1_RE);
 
+    UART_enable_nvic_it(UARTx);
+    UARTx->CR1 |= (1 << 5);
+    UARTx->CR1 &= ~(1 << 7);
+
     // Enable USART
     UARTx->CR1 |= USART_CR1_UE;
 
@@ -44,75 +63,65 @@ void UART_Init (USART_TypeDef * UARTx) {
 
     // Verify that USART is ready for reception
     while ((UARTx->ISR & USART_ISR_REACK) == 0);
-}
 
-void UART_send_char(USART_TypeDef * UARTx, char ch) {
-    // Wait until transmit data register is empty
-    while ((UARTx->ISR & (1 << 7)) == 0);
-
-    // Send character
-    UARTx->TDR = ch;
-}
-
-void UART_send_string(USART_TypeDef * UARTx, char * str) {
-    // Send each character in the string
-    while (*str) {
-        UART_send_char(UARTx, *str++);
-    }
-}
-
-uint8_t  UART_receive_char(USART_TypeDef * UARTx) {
-    // Wait until data is received
-    while ((UARTx->ISR & (1 << 5)) == 0);
-
-    // Read received data
-    return UARTx->RDR;
-}
-
-void UART_receive_string(USART_TypeDef * UARTx, uint8_t *buffer, uint8_t len) {
-    uint8_t i = 0;
-    while (i < len) {
-        buffer[i] = UART_receive_char(UARTx);
-        i++;
-    }
-}
-
-void UART_enable_nvic_it(USART_TypeDef * UARTx) {
-    if (UARTx == USART1) {
-        NVIC->ISER[1] |= (1 << 5);
-    } else if (UARTx == USART2) {
-        NVIC->ISER[1] |= (1 << 6);
-    } else if (UARTx == USART3) {
-        NVIC->ISER[1] |= (1 << 7);
-    }
 }
 
 uint8_t *rx_buffer;
 uint8_t rx_len;
 uint8_t rx_index;
 uint8_t rx_ready;
+
+char *USART2_Buffer_Rx;
+uint8_t Tx2_Counter;
+uint8_t tx_ready=1;
+
+
 void UART_receive_it(USART_TypeDef * UARTx, uint8_t *buffer, uint8_t len)
 {
-    UART_enable_nvic_it(UARTx);
-    // Enable receive interrupt
-    UARTx->CR1 |= (1 << 5);
-    // Set buffer and length
     rx_buffer = buffer;
     rx_len = len;
     rx_index = 0;
 }
+
+
+void UART_print(USART_TypeDef *USARTx, char *str){
+    while(!tx_ready);
+    USARTx->CR1 |= USART_CR1_TXEIE;
+    USART2_Buffer_Rx = str;
+    Tx2_Counter = 0;
+    tx_ready = 0;
+    USARTx->TDR = '\0';
+}
+
+
+
 void USART2_IRQHandler(void) {
     // Check if the USART2 receive interrupt flag is set
-    if (USART2->ISR & (1 << 5)) {
+    if (USART2->ISR & USART_ISR_RXNE) {
         // Clear the interrupt flag
-        USART2->ICR |= (1 << 5);
+        USART2->ICR |= USART_ISR_RXNE;
+        uint32_t data = USART2->RDR;
         // Read received data
-        rx_buffer[rx_index] = USART2->RDR;
-        rx_index++;
-        if (rx_index == rx_len) {
-            // Disable receive interrupt
-            USART2->CR1 &= ~(1 << 5);
-            rx_ready = 1;
+        switch (data) {
+            case LEFT:
+            case RIGHT:
+            case HAZARD:
+                update_fms(data);
+                break;
+            default:
+                UART_print(USART2, "Unknown command, please use either 'L', 'R', or 'P'\r\n");
+                return;
+        }
+    }
+
+    if (USART2->ISR & USART_ISR_TXE) {
+        if (USART2_Buffer_Rx[Tx2_Counter] != '\0') {
+            USART2->TDR = USART2_Buffer_Rx[Tx2_Counter];
+            Tx2_Counter++;
+        }
+        else {
+            tx_ready=1;
+            USART2->CR1 &= ~USART_CR1_TXEIE;
         }
     }
 }

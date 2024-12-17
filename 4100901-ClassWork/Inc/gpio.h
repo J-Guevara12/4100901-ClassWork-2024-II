@@ -1,5 +1,5 @@
-
 #include <stdint.h>
+#define BLINK_PERIOD_MS 1000
 
 typedef struct {
     volatile uint32_t MEMRMP;
