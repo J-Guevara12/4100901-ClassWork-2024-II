@@ -85,7 +85,6 @@ void UART_receive_it(USART_TypeDef * UARTx, uint8_t *buffer, uint8_t len)
 
 
 void UART_print(USART_TypeDef *USARTx, char *str){
-    while(!tx_ready);
     USARTx->CR1 |= USART_CR1_TXEIE;
     USART2_Buffer_Rx = str;
     Tx2_Counter = 0;
