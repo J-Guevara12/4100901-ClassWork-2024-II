@@ -1,31 +1,53 @@
 #include "gpio.h"
 #include "rcc.h"
+#include "uart.h"
+#include "fms.h"
+#include "systick.h"
 
 #define EXTI_BASE 0x40010400
 #define EXTI ((EXTI_t *)EXTI_BASE)
 
 #define EXTI15_10_IRQn 40
 #define NVIC_ISER1 ((uint32_t *)(0xE000E104)) // NVIC Interrupt Set-Enable Register
-
+#define MIN_PRESS_TIME_MS 50
 
 
 #define SYSCFG_BASE 0x40010000
 #define SYSCFG ((SYSCFG_t *)SYSCFG_BASE)
 
+#define TOGGLE_LED()           (GPIOC->ODR ^= (1 << 8))
 
-#define GPIOA ((GPIO_t *)0x48000000) // Base address of GPIOA
-#define GPIOC ((GPIO_t *)0x48000800) // Base address of GPIOC
+#define HEART_BEAT_LED_PIN 5 // Pin 5 of GPIOA
+#define RIGHT_LED_PIN 6      // Pin 6 of GPIOA
+#define LEFT_LED_PIN 7       // Pin 7 of GPIOA
 
-#define LED_PIN 5 // Pin 5 of GPIOA
-#define BUTTON_PIN 13 // Pin 13 of GPIOC
+#define RIGHT_PIN       13  // Pin 13 of GPIOB
+#define HAZARD_PIN      14  // Pin 14 of GPIOB
+#define LEFT_PIN        15  // Pin 15 of GPIOB
 
-#define BUTTON_IS_PRESSED()    (!(GPIOC->IDR & (1 << BUTTON_PIN)))
-#define BUTTON_IS_RELEASED()   (GPIOC->IDR & (1 << BUTTON_PIN))
-#define TOGGLE_LED()           (GPIOA->ODR ^= (1 << LED_PIN))
+int last_time_pressed=0;
 
-volatile uint8_t button_pressed = 0; // Flag to indicate button press
+void configure_interrupt(GPIO_t *GPIOx, int PIN) {
+    int EXTICR_idx = (PIN/4);
+    int EXTICR_offset = PIN%4;
+    // Configure SYSCFG EXTICR to map EXTIX to PxX
+    SYSCFG->EXTICR[EXTICR_idx] &= ~(0xF << 4* EXTICR_offset); // Clear bits for EXTI13
+    SYSCFG->EXTICR[EXTICR_idx] |= ((int )(GPIOx-GPIOA)/400 << 4*EXTICR_offset);  // Map EXTI13 to Port B
 
-void configure_gpio_for_usart() {
+    // Configure EXTI13 for falling edge trigger
+    EXTI->FTSR1 |= (1 << PIN);  // Enable falling trigger
+    EXTI->RTSR1 &= ~(1 << PIN); // Disable rising trigger
+
+    // Unmask EXTI13
+    EXTI->IMR1 |= (1 << PIN);
+
+    // Configure PA2 and PA3 as no pull-up, no pull-down
+    GPIOx->PUPDR |= (1 << (PIN * 2)); // No pull-up, no pull-down for PA2
+    init_gpio_pin(GPIOx, PIN, 0x0); // Set BUTTON pin as input
+
+}
+
+void configure_gpio_for_usart(void) {
     // Enable GPIOA clock
     *RCC_AHB2ENR |= (1 << 0);
 
@@ -60,24 +82,20 @@ void init_gpio_pin(GPIO_t *GPIOx, uint8_t pin, uint8_t mode)
 
 void configure_gpio(void)
 {
-    *RCC_AHB2ENR |= (1 << 0) | (1 << 2); // Enable clock for GPIOA and GPIOC
+    *RCC_AHB2ENR |= (1 << 0) | (1 << 1); // Enable clock for GPIOA and GPIOB
 
     // Enable clock for SYSCFG
     *RCC_APB2ENR |= (1 << 0); // RCC_APB2ENR_SYSCFGEN
 
-    // Configure SYSCFG EXTICR to map EXTI13 to PC13
-    SYSCFG->EXTICR[3] &= ~(0xF << 4); // Clear bits for EXTI13
-    SYSCFG->EXTICR[3] |= (0x2 << 4);  // Map EXTI13 to Port C
 
-    // Configure EXTI13 for falling edge trigger
-    EXTI->FTSR1 |= (1 << BUTTON_PIN);  // Enable falling trigger
-    EXTI->RTSR1 &= ~(1 << BUTTON_PIN); // Disable rising trigger
+    init_gpio_pin(GPIOA, HEART_BEAT_LED_PIN, 0x1); // Set LED pin as output
+    init_gpio_pin(GPIOA, LEFT_LED_PIN, 0x1); // Set LED pin as output
+    init_gpio_pin(GPIOA, RIGHT_LED_PIN, 0x1); // Set LED pin as output
+    init_gpio_pin(GPIOC, 8, 0x1); // Set LED pin as output
 
-    // Unmask EXTI13
-    EXTI->IMR1 |= (1 << BUTTON_PIN);
-
-    init_gpio_pin(GPIOA, LED_PIN, 0x1); // Set LED pin as output
-    init_gpio_pin(GPIOC, BUTTON_PIN, 0x0); // Set BUTTON pin as input
+    configure_interrupt(GPIOB, RIGHT_PIN);
+    configure_interrupt(GPIOB, HAZARD_PIN);
+    configure_interrupt(GPIOB, LEFT_PIN);
 
     // Enable EXTI15_10 interrupt
     *NVIC_ISER1 |= (1 << (EXTI15_10_IRQn - 32));
@@ -85,20 +103,23 @@ void configure_gpio(void)
     configure_gpio_for_usart();
 }
 
-uint8_t gpio_button_is_pressed(void)
-{
-    return BUTTON_IS_PRESSED();
-}
-
-void gpio_toggle_led(void)
-{
-    TOGGLE_LED();
-}
-
 void EXTI15_10_IRQHandler(void)
 {
-    if (EXTI->PR1 & (1 << BUTTON_PIN)) {
-        EXTI->PR1 = (1 << BUTTON_PIN); // Clear pending bit
-        button_pressed = 1; // Set button pressed flag
+    TOGGLE_LED();
+    int data = EXTI->PR1;
+    EXTI->PR1 = data;
+    if (last_time_pressed-systick_GetTick()<MIN_PRESS_TIME_MS){
+        return;
     }
+    last_time_pressed = systick_GetTick();
+    BUTTON b;
+    switch (data) {
+        case (1<<RIGHT_PIN):
+            b = RIGHT; break;
+        case (1<<HAZARD_PIN):
+            b = HAZARD; break;
+        case (1<<LEFT_PIN):
+            b = LEFT; break;
+    }
+    update_fms(b);
 }

@@ -1,6 +1,10 @@
 #include <stdint.h>
 #define BLINK_PERIOD_MS 1000
 
+#define GPIOA ((GPIO_t *)0x48000000) // Base address of GPIOA
+#define GPIOB ((GPIO_t *)0x48000400) // Base address of GPIOA
+#define GPIOC ((GPIO_t *)0x48000800) // Base address of GPIOC
+
 typedef struct {
     volatile uint32_t MEMRMP;
     volatile uint32_t CFGR1;
@@ -43,3 +47,4 @@ void configure_gpio(void);
 
 uint8_t gpio_button_is_pressed(void);
 void gpio_toggle_led(void);
+
